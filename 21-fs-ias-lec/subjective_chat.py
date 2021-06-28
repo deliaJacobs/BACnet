@@ -554,14 +554,15 @@ class Chat(Frame):
         w = OptionMenu(newWindow, variable, *OPTIONS)
         w.grid(row=3, column=0, padx=10, pady=10)
 
+        entryFieldFriend = Entry(newWindow)
+        entryFieldFriend.grid(row=4, column=0,padx=10, pady=10)
+
         changeFriendsUsernameButton = Button(newWindow, text=" change username ",
-                                  command=lambda: self.changeUsername("NewName"), bg="#34B7F1",
+                                  command=lambda: self.changeUsername(entryFieldFriend.get(), entryFieldFriend.delete(0, 'end')), bg="#34B7F1",
                                   activebackground="#0f9bd7", font=('HelveticaNeue', 11))
 
         changeFriendsUsernameButton.grid(column=1, row=4, padx=10, pady=10)
 
-        entryField = Entry(newWindow)
-        entryField.grid(row=4, column=0,padx=10, pady=10)
 
         Label(newWindow, text="List of all your nicknames:", font=('HelveticaNeue', 11)).grid(row=5, column=0, padx=10, pady=10)
 
@@ -587,7 +588,7 @@ class Chat(Frame):
         newWindow.mainloop()
 
     def changeUsername(self, newUsername):
-        print("something should happen")
+        print(newUsername)
         #self.username = newUsername
         #self.dictionary = {
          #   'username': self.username,
