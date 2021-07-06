@@ -68,15 +68,19 @@ def setTrusted():
     ufh.set_trusted(curID, True)
     feedIDsTree.item(curItemID, tags=('followed'))
 
+"""
     print("I am trusting")
 
     with open('username.pkl', 'rb') as f:
         file = pickle.load(f)
+    f.close()
 
     username = file.get('username')
     print("ui" + username)
 
     ufh.set_trusted_name(username)
+"""
+
 
 
 

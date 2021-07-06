@@ -400,6 +400,7 @@ class Chat(Frame):
 
         for i in range(1, len(chat)):
             chat_message = chat[i][0].split("#split:#")  # a chat-message is like: username#split:#message, so we need to split this two
+
             partner_username = chat_message[0]  # from who is the message
             message = chat_message[1]  # the real content / message
             additional_msg = chat_message[2]
@@ -534,44 +535,55 @@ class Chat(Frame):
         newWindow = Tk()
         newWindow.title("Nicknames")
         self.geometry = newWindow.geometry("500x500")
-        Label(newWindow, text="Change your username:", font=('HelveticaNeue', 11)).grid(row=0, column=0, padx=10, pady=10)
-        changeUsernameButton = Button(newWindow, text=" change username ",
-                                  command=lambda: self.changeUsername("NewName"), bg="#34B7F1",
-                                  activebackground="#0f9bd7", font=('HelveticaNeue', 11))
-
-        changeUsernameButton.grid(column=1, row=1, padx=10, pady=10)
 
 
         entryField = Entry(newWindow)
         entryField.grid(row=1, column=0,padx=10, pady=10)
 
+        Label(newWindow, text="Change your username:", font=('HelveticaNeue', 11)).grid(row=0, column=0, padx=10, pady=10)
+        changeUsernameButton = Button(newWindow, text=" change username ",
+                                  command=lambda: [self.changeUsername(entryField.get()),entryField.delete(0,'end')], bg="#34B7F1",
+                                  activebackground="#0f9bd7", font=('HelveticaNeue', 11))
+
+        changeUsernameButton.grid(column=1, row=1, padx=10, pady=10)
+
+
+
         Label(newWindow, text="Change a friends nickname:", font=('HelveticaNeue', 11)).grid(row=2, column=0, padx=10, pady=10)
 
 
-        optionList = self.getFriendsOptions(self.username)
+        names = []
+        """
+        diction = {}
+        diction['Olaf'] = 'Anna'
+        file1 = open('connectedPerson.pkl', 'wb')
+        pickle.dump(diction, file1)
+        file1.close()
+        """
+
+        try:
+            with open('connectedPerson.pkl', 'rb') as f:
+                file = pickle.load(f)
+            f.close()
+            names = file.values()
+        except EOFError:
+            names = ['']
+        except FileNotFoundError:
+            print("connectedPerson.pkl couldn't be found")
 
 
-        #belongs somewhere else...
-        file = open("connectedPerson.txt", "r")
-        connectedNames = file.readlines()
-        file.close()
-
-        for i in range(len(connectedNames)):
-            connectedNames[i] = connectedNames[i].replace("\n", "")
-
-        print(connectedNames)
 
         variable = StringVar(newWindow)
         variable.set("Choose a Friend")  # default value
 
-        w = OptionMenu(newWindow, variable, *connectedNames)
+        w = OptionMenu(newWindow, variable, *names)
         w.grid(row=3, column=0, padx=10, pady=10)
 
         entryFieldFriend = Entry(newWindow)
         entryFieldFriend.grid(row=4, column=0,padx=10, pady=10)
 
         changeFriendsUsernameButton = Button(newWindow, text=" change username ",
-                                  command=lambda: [self.changeUsername(entryFieldFriend.get()), entryFieldFriend.delete(0,'end')], bg="#34B7F1",
+                                  command=lambda: [self.changeFriendsUsername(entryFieldFriend.get(), variable.get()), entryFieldFriend.delete(0,'end')], bg="#34B7F1",
                                   activebackground="#0f9bd7", font=('HelveticaNeue', 11))
 
         changeFriendsUsernameButton.grid(column=1, row=4, padx=10, pady=10)
@@ -602,42 +614,6 @@ class Chat(Frame):
 
         newWindow.mainloop()
 
-    def getFriendsOptions(self, username):
-
-        chats = [len(self.person_list)]
-
-        for i in range(len(self.person_list)):
-            if i == 0:
-                self.partner[0] = self.person_list[0][0]
-                self.partner[1] = self.person_list[0][1]
-                chats.append(self.chat_function.get_full_chat(self.partner[1]))
-            else:
-                self.partner[0] = self.person_list[i][0]
-                self.partner[1] = self.person_list[i][1]
-                chats.append(self.chat_function.get_full_chat(self.partner[1]))
-
-        for i in range(len(chats)):
-            chat = []
-            if not isinstance(chats[i], int):
-                chat = chats[i]
-                print(chat)
-                str = '\n'.join([tup[0] for tup in chat])
-                print (str)
-                strList = re.split('#split:#|\n', str )
-
-                names = []
-                for j in range(len(strList)- 2):
-                    if strList[j+2] == 'msg' and strList[j] is not username:
-                        names.append(strList[j])
-
-
-        #TODO: delete!
-
-        names.append("Olaf")
-        names.append("Elsa")
-
-        return names
-
     def changeUsername(self, newUsername):
         self.dictionary['username'] = newUsername
 
@@ -649,25 +625,39 @@ class Chat(Frame):
         print("Your username has been changed to: " + self.dictionary['username'])
         #print(self.partner[1])
         self.master.title("BAC net  -  " + newUsername.upper())
-        #Login.open_Chat(self)
-            #Chat(master=root)
-        #self.username = newUsername
-        #self.dictionary = {
-         #   'username': self.username,
-         #   'public_key': self.public_key
-       # }
-        #pickle.dump(self.dictionary, open(pickle_file_names[1], "wb"))  # save username and key
-        #print("Your username has been saved:", username)
-        #print("username", username)
-        #print("self.username", self.username)
 
-    def changeFriendsUsername(self, newFriendsUsername):
+        changedMyUsernameEvent = self.ecf.next_event('chat/MyNameChanged', {'newName': newUsername, 'fromUser': self.username})
+        chat_function = ChatFunction()
+        event = Event.from_cbor(changedMyUsernameEvent)
+        chat_function.insert_event(changedMyUsernameEvent)
+
+
+
+    def changeFriendsUsername(self, newFriendsUsername, oldName):
         # create an event
         changeFriendsUsernameEvent = self.ecf.next_event('chat/nameChanged', {'newName': newFriendsUsername, 'fromUser': self.username})
         chat_function = ChatFunction()
         event = Event.from_cbor(changeFriendsUsernameEvent)
         chat_function.insert_event(changeFriendsUsernameEvent)
-        print(self.partner[0] + "'s name has been changed to: " + newFriendsUsername)
+        print(oldName + "'s name has been changed to: " + newFriendsUsername)
+
+        with open('connectedPerson.pkl', 'rb') as f:
+            file = pickle.load(f)
+        f.close()
+
+        key = ''
+        items = file.items()
+        for t in items:
+            if t[1] == oldName:
+                key = t[0]
+
+        file[key] = newFriendsUsername
+
+        f = open('connectedPerson.pkl', 'wb')
+        pickle.dump(file, f)
+        f.close()
+
+
 
     def saveTypeAndSwitchState(self, Type):
         if Type == 'back':
@@ -876,11 +866,24 @@ class Chat(Frame):
             self.partner[0]=name
             self.partner[1]=ID
             self.save(name+"#split:#member#split:#group", ID)
+
+        sendNameEvent = self.ecf.next_event('chat/sendName',{'name': self.username})
+        chat_function = ChatFunction()
+        event = Event.from_cbor(sendNameEvent)
+        chat_function.insert_event(sendNameEvent)
+
         self.addPartners()
         self.loadChat(self.partner)
 
     def join_chat(self, ID):
         if self.is_joinable(ID):
+
+            sendNameEvent = self.ecf.next_event('chat/sendName',{'name': self.username})
+            chat_function = ChatFunction()
+            event = Event.from_cbor(sendNameEvent)
+            chat_function.insert_event(sendNameEvent)
+
+
             self.person_list.append([ID, ID, 0])
             partnerName = self.chat_function.get_full_chat(ID)[0][0].split("#split:#")[1]  # taking the name of the partner for the frome the first message
             self.person_list[-1][0] = partnerName  # index -1 is the index of the last list-element

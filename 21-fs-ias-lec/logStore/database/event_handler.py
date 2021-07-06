@@ -8,6 +8,8 @@ from ..funcs.log import create_logger
 
 logger = create_logger('EventHandler')
 
+connPep = {}
+
 
 class EventHandler(metaclass=Singleton):
 
@@ -31,7 +33,40 @@ class EventHandler(metaclass=Singleton):
             if application == 'chat':
                 if application_action == 'MASTER':
                     return
+
+                elif application_action =='sendName':
+
+                    newName = content[1]['name']
+                    username_file = open("username.pkl", 'rb')
+                    username_dict = pickle.load(username_file)
+                    username_file.close()
+
+                    if not newName == username_dict['username']:
+                        connPep[content[1]['name']] = content[1]['name']
+                        file = open('connectedPerson.pkl', 'wb')
+                        pickle.dump(connPep, file)
+                        file.close()
+
+                elif application_action == 'MyNameChanged':
+                    f = open('connectedPerson.pkl', 'rb')
+                    entries = pickle.load(f)
+
+                    for entry in entries:
+
+                        # entry[0] = key for specific entry, content[1]['fromUser'] = oldUsername
+                        if entry[0] == content[1]['fromUser']:
+                            # there is no nickname for this person
+                            if entry[0] == entry[1]:
+                                entries[content[1]['newName']] = content[1]['fromUser']
+                            else:
+                                #there is a nickname for this person
+                                entries[content[1]['newName']] = entries[content[1]['fromUser']]
+
+
+
+
                 elif application_action == 'nameChanged':
+                    #Someone gave me a nickname
                     newName = content[1]['newName']
                     fromUser = content[1]['fromUser']
                     # only add the name if fromUser is not you:
@@ -75,12 +110,6 @@ class EventHandler(metaclass=Singleton):
                                                                    application=application_action,
                                                                    username=username, oldusername=oldusername,
                                                                    timestamp=timestamp, text='')
-            elif application == 'feed_control':
-                file = open("connectedPerson.txt", "a")
-                file.write("\n")
-                print("event handler " + content[1]['trustedName'])
-                file.write(content[1]['trustedName'])
-                file.close()
 
             elif application == 'MASTER':
                 self.master_handler(seq_no, feed_id, content, cont_ident, event_as_cbor)

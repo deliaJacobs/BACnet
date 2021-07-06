@@ -74,11 +74,13 @@ class UiFunctionHandler:
     def set_username(self, name):
         new_event = self._eventCreationWrapper.create_name(name)
         self._fcc.add_event(new_event)
-
+    """
     def set_trusted_name(self, name):
         print("uiFunctionsHandler " + name)
         new_event = self._eventCreationWrapper.create_trusted_name(name)
         self._fcc.add_event(new_event)
+    """
+
 
     def get_application(self, feed_id):
         # return application name from given feed_id
