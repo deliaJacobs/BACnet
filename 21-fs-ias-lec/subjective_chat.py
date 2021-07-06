@@ -34,6 +34,7 @@ import math
 import platform
 import time
 import datetime
+import Event
 from nacl.signing import SigningKey
 from nacl.encoding import HexEncoder
 
@@ -70,6 +71,7 @@ pyglet.font.add_file(os.path.join(dirname, 'subChat/font/helveticaneue/Helvetica
 app = None  # currently active app
 pickle_file_names = ['personList.pkl', 'username.pkl']  # use to reset user or create new one
 switch = ["", "", ""]
+my_names = []
 
 # -----------------------------------------------------------------------------
 
@@ -528,16 +530,18 @@ class Chat(Frame):
         newWindow = Tk()
         newWindow.title("Nicknames")
         newWindow.geometry("500x500")
+
+        entryField = Entry(newWindow)
+        entryField.grid(row=1, column=0,padx=10, pady=10)
+
         Label(newWindow, text="Change your username:", font=('HelveticaNeue', 11)).grid(row=0, column=0, padx=10, pady=10)
         changeUsernameButton = Button(newWindow, text=" change username ",
-                                  command=lambda: self.changeUsername("NewName"), bg="#34B7F1",
+                                  command=lambda: self.changeUsername(entryField.get()), bg="#34B7F1",
                                   activebackground="#0f9bd7", font=('HelveticaNeue', 11))
 
         changeUsernameButton.grid(column=1, row=1, padx=10, pady=10)
 
 
-        entryField = Entry(newWindow)
-        entryField.grid(row=1, column=0,padx=10, pady=10)
 
         Label(newWindow, text="Change a friends nickname:", font=('HelveticaNeue', 11)).grid(row=2, column=0, padx=10, pady=10)
 
@@ -558,7 +562,7 @@ class Chat(Frame):
         entryFieldFriend.grid(row=4, column=0,padx=10, pady=10)
 
         changeFriendsUsernameButton = Button(newWindow, text=" change username ",
-                                  command=lambda: self.changeUsername(entryFieldFriend.get(), entryFieldFriend.delete(0, 'end')), bg="#34B7F1",
+                                  command=lambda: self.changeFriendsUsername(entryFieldFriend.get()), bg="#34B7F1",
                                   activebackground="#0f9bd7", font=('HelveticaNeue', 11))
 
         changeFriendsUsernameButton.grid(column=1, row=4, padx=10, pady=10)
@@ -574,21 +578,34 @@ class Chat(Frame):
         scrollbar.config(command=listbox.yview)
 
         listbox.config(yscrollcommand=scrollbar.set)
+        try:
+            # if my_names.txt exists:
+            my_names_file = open("my_names.txt", 'r')
+            my_names_list = my_names_file.read().split(", ")
 
-        OPTIONS1 = [
-            "Delia1",
-            "Jacobs",
-            "DJ"
-        ]
+        except FileNotFoundError:
+            # if my_names.txt does not exists:
+            my_names_list = []
 
-        listbox.insert(END, *OPTIONS1)
-
+        # add my_names_list into listbox
+        listbox.insert(END, *my_names_list)
 
 
         newWindow.mainloop()
 
     def changeUsername(self, newUsername):
-        print(newUsername)
+        self.dictionary['username'] = newUsername
+
+        #change the file of names to save new username
+        outfile = open(pickle_file_names[1], "wb")
+        pickle.dump(self.dictionary,outfile)
+        outfile.close()
+
+        print("Your username has been changed to: " + self.dictionary['username'])
+        #print(self.partner[1])
+        self.master.title("BAC net  -  " + newUsername.upper())
+        #Login.open_Chat(self)
+            #Chat(master=root)
         #self.username = newUsername
         #self.dictionary = {
          #   'username': self.username,
@@ -599,8 +616,13 @@ class Chat(Frame):
         #print("username", username)
         #print("self.username", self.username)
 
-
-
+    def changeFriendsUsername(self, newFriendsUsername):
+        # create an event
+        changeFriendsUsernameEvent = self.ecf.next_event('chat/nameChanged', {'newName': newFriendsUsername, 'fromUser': self.username})
+        chat_function = ChatFunction()
+        event = Event.from_cbor(changeFriendsUsernameEvent)
+        chat_function.insert_event(changeFriendsUsernameEvent)
+        print(self.partner[0] + "'s name has been changed to: " + newFriendsUsername)
 
     def saveTypeAndSwitchState(self, Type):
         if Type == 'back':
