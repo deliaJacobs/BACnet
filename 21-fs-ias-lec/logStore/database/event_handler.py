@@ -6,10 +6,6 @@ from ..funcs.constants import SQLITE
 from ..funcs.event import Event
 from ..funcs.log import create_logger
 
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/master
 logger = create_logger('EventHandler')
 
 
@@ -56,14 +52,8 @@ class EventHandler(metaclass=Singleton):
                     timestamp = content[1]['timestampkey']
 
                     self.__sqlAlchemyConnector.insert_event(feed_id=feed_id, seq_no=seq_no, application=application,
-<<<<<<< HEAD
-                                                        chat_id=chat_id,
-                                                        timestamp=timestamp, data=chatMsg)
-
-=======
                                                             chat_id=chat_id,
                                                             timestamp=timestamp, data=chatMsg)
->>>>>>> origin/master
 
 
             elif application == 'KotlinUI':
