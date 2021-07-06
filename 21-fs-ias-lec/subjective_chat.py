@@ -35,6 +35,8 @@ import platform
 import time
 import datetime
 import Event
+
+import re
 from nacl.signing import SigningKey
 from nacl.encoding import HexEncoder
 
@@ -60,6 +62,8 @@ from logStore.appconn.chat_connection import ChatFunction
 # Import our (gruppe03) libraries
 from subChat import Colorize
 from subChat import TextWrapper
+
+from logStore import database
 
 # Load Fonts
 # Helvetica Neue:
@@ -529,40 +533,45 @@ class Chat(Frame):
     def openNameWindow(self):
         newWindow = Tk()
         newWindow.title("Nicknames")
-        newWindow.geometry("500x500")
-
-        entryField = Entry(newWindow)
-        entryField.grid(row=1, column=0,padx=10, pady=10)
-
+        self.geometry = newWindow.geometry("500x500")
         Label(newWindow, text="Change your username:", font=('HelveticaNeue', 11)).grid(row=0, column=0, padx=10, pady=10)
         changeUsernameButton = Button(newWindow, text=" change username ",
-                                  command=lambda: self.changeUsername(entryField.get()), bg="#34B7F1",
+                                  command=lambda: self.changeUsername("NewName"), bg="#34B7F1",
                                   activebackground="#0f9bd7", font=('HelveticaNeue', 11))
 
         changeUsernameButton.grid(column=1, row=1, padx=10, pady=10)
 
 
+        entryField = Entry(newWindow)
+        entryField.grid(row=1, column=0,padx=10, pady=10)
 
         Label(newWindow, text="Change a friends nickname:", font=('HelveticaNeue', 11)).grid(row=2, column=0, padx=10, pady=10)
 
-        OPTIONS = [
-            "Neha",
-            "Olaf",
-            "Anna",
-            "Elsa"
-        ]
+
+        optionList = self.getFriendsOptions(self.username)
+
+
+        #belongs somewhere else...
+        file = open("connectedPerson.txt", "r")
+        connectedNames = file.readlines()
+        file.close()
+
+        for i in range(len(connectedNames)):
+            connectedNames[i] = connectedNames[i].replace("\n", "")
+
+        print(connectedNames)
 
         variable = StringVar(newWindow)
         variable.set("Choose a Friend")  # default value
 
-        w = OptionMenu(newWindow, variable, *OPTIONS)
+        w = OptionMenu(newWindow, variable, *connectedNames)
         w.grid(row=3, column=0, padx=10, pady=10)
 
         entryFieldFriend = Entry(newWindow)
         entryFieldFriend.grid(row=4, column=0,padx=10, pady=10)
 
         changeFriendsUsernameButton = Button(newWindow, text=" change username ",
-                                  command=lambda: self.changeFriendsUsername(entryFieldFriend.get()), bg="#34B7F1",
+                                  command=lambda: [self.changeUsername(entryFieldFriend.get()), entryFieldFriend.delete(0,'end')], bg="#34B7F1",
                                   activebackground="#0f9bd7", font=('HelveticaNeue', 11))
 
         changeFriendsUsernameButton.grid(column=1, row=4, padx=10, pady=10)
@@ -592,6 +601,42 @@ class Chat(Frame):
 
 
         newWindow.mainloop()
+
+    def getFriendsOptions(self, username):
+
+        chats = [len(self.person_list)]
+
+        for i in range(len(self.person_list)):
+            if i == 0:
+                self.partner[0] = self.person_list[0][0]
+                self.partner[1] = self.person_list[0][1]
+                chats.append(self.chat_function.get_full_chat(self.partner[1]))
+            else:
+                self.partner[0] = self.person_list[i][0]
+                self.partner[1] = self.person_list[i][1]
+                chats.append(self.chat_function.get_full_chat(self.partner[1]))
+
+        for i in range(len(chats)):
+            chat = []
+            if not isinstance(chats[i], int):
+                chat = chats[i]
+                print(chat)
+                str = '\n'.join([tup[0] for tup in chat])
+                print (str)
+                strList = re.split('#split:#|\n', str )
+
+                names = []
+                for j in range(len(strList)- 2):
+                    if strList[j+2] == 'msg' and strList[j] is not username:
+                        names.append(strList[j])
+
+
+        #TODO: delete!
+
+        names.append("Olaf")
+        names.append("Elsa")
+
+        return names
 
     def changeUsername(self, newUsername):
         self.dictionary['username'] = newUsername
@@ -954,7 +999,7 @@ class Chat(Frame):
                     index -= 1
                     part_as_string = messages[index][0].split("#split:#")
                     if len(part_as_string) == 4 and part_as_string[0] == sender_of_file:
-                        content_of_file.append(part_as_string[1]) 
+                        content_of_file.append(part_as_string[1])
                         counter -= 1
 
                 type_of_file = ""

@@ -5,11 +5,11 @@ Created on Tue May 19 15:15:14 2020
 
 @author: yannickrummele
 """
-
+import pickle
 from tkinter import *
 from tkinter import ttk
-#from uiFunctionsHandler import UiFunctionHandler
 from .uiFunctionsHandler import *
+
 
 
 ufh = UiFunctionHandler()
@@ -68,7 +68,16 @@ def setTrusted():
     ufh.set_trusted(curID, True)
     feedIDsTree.item(curItemID, tags=('followed'))
 
-    
+    print("I am trusting")
+
+    with open('username.pkl', 'rb') as f:
+        file = pickle.load(f)
+
+    username = file.get('username')
+    print("ui" + username)
+
+    ufh.set_trusted_name(username)
+
 
 
 def setUntrusted():
