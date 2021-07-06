@@ -34,6 +34,8 @@ import math
 import platform
 import time
 import datetime
+
+import re
 from nacl.signing import SigningKey
 from nacl.encoding import HexEncoder
 
@@ -59,6 +61,8 @@ from logStore.appconn.chat_connection import ChatFunction
 # Import our (gruppe03) libraries
 from subChat import Colorize
 from subChat import TextWrapper
+
+from logStore import database
 
 # Load Fonts
 # Helvetica Neue:
@@ -133,12 +137,12 @@ class Login(Frame):
 
     # -------------- HELP FUNCTIONS --------------
     def create_key(self, username=None):
-        if username != "" and len(username) <= 16:            
+        if username != "" and len(username) <= 16:
             ecf = EventCreationTool.EventFactory()
             public_key = ecf.get_feed_id()
             chat_function = ChatFunction()
             first_event = ecf.first_event('chat', chat_function.get_host_master_id())
-            
+
             chat_function.insert_event(first_event)
 
             self.dictionary = {
@@ -242,7 +246,7 @@ class Chat(Frame):
         self.time = datetime.datetime.now()
         self.lastMessage = list()
         self.chat_function = ChatFunction()
-        
+
         # Set EventFactory      
         x = self.chat_function.get_current_event(self.chat_function.get_all_feed_ids()[1])
         most_recent_event = self.chat_function.get_current_event(self.feed_id)
@@ -490,14 +494,14 @@ class Chat(Frame):
         for i in range(len(self.person_list)):
             if self.person_list[i][1] == self.partner[1]:
                 self.person_list[i][2] = time.time()
-                
+
         chat_type = self.chat_function.get_full_chat(self.partner[1])[0][0].split("#split:#")[3]  # get the type of the chat (private or group)
-    
+
         if chat_type == "private":
             self.username_label.config(text=TextWrapper.shorten_name(self.partner[0], 34))
         else:  # chat_type == "group"
             self.username_label.config(text=TextWrapper.shorten_name(self.partner[0], 27) + " (" + self.partner[1] + ")")
-    
+
         self.updateContent(self.partner[1])
 
     def check_for_new_messages(self, person_nr):
@@ -527,7 +531,7 @@ class Chat(Frame):
     def openNameWindow(self):
         newWindow = Tk()
         newWindow.title("Nicknames")
-        newWindow.geometry("500x500")
+        self.geometry = newWindow.geometry("500x500")
         Label(newWindow, text="Change your username:", font=('HelveticaNeue', 11)).grid(row=0, column=0, padx=10, pady=10)
         changeUsernameButton = Button(newWindow, text=" change username ",
                                   command=lambda: self.changeUsername("NewName"), bg="#34B7F1",
@@ -541,24 +545,33 @@ class Chat(Frame):
 
         Label(newWindow, text="Change a friends nickname:", font=('HelveticaNeue', 11)).grid(row=2, column=0, padx=10, pady=10)
 
-        OPTIONS = [
-            "Neha",
-            "Olaf",
-            "Anna",
-            "Elsa"
-        ]
+
+        optionList = self.getFriendsOptions(self.username)
+
+
+        #belongs somewhere else...
+        file = open("connectedPerson.txt", "r")
+        connectedNames = file.readlines()
+        file.close()
+
+        for i in range(len(connectedNames)):
+            connectedNames[i] = connectedNames[i].replace("\n", "")
+
+        print(connectedNames)
 
         variable = StringVar(newWindow)
         variable.set("Choose a Friend")  # default value
 
-        w = OptionMenu(newWindow, variable, *OPTIONS)
+        w = OptionMenu(newWindow, variable, *connectedNames)
         w.grid(row=3, column=0, padx=10, pady=10)
+
+        
 
         entryFieldFriend = Entry(newWindow)
         entryFieldFriend.grid(row=4, column=0,padx=10, pady=10)
 
         changeFriendsUsernameButton = Button(newWindow, text=" change username ",
-                                  command=lambda: self.changeUsername(entryFieldFriend.get(), entryFieldFriend.delete(0, 'end')), bg="#34B7F1",
+                                  command=lambda: [self.changeUsername(entryFieldFriend.get()), entryFieldFriend.delete(0,'end')], bg="#34B7F1",
                                   activebackground="#0f9bd7", font=('HelveticaNeue', 11))
 
         changeFriendsUsernameButton.grid(column=1, row=4, padx=10, pady=10)
@@ -586,6 +599,42 @@ class Chat(Frame):
 
 
         newWindow.mainloop()
+
+    def getFriendsOptions(self, username):
+
+        chats = [len(self.person_list)]
+
+        for i in range(len(self.person_list)):
+            if i == 0:
+                self.partner[0] = self.person_list[0][0]
+                self.partner[1] = self.person_list[0][1]
+                chats.append(self.chat_function.get_full_chat(self.partner[1]))
+            else:
+                self.partner[0] = self.person_list[i][0]
+                self.partner[1] = self.person_list[i][1]
+                chats.append(self.chat_function.get_full_chat(self.partner[1]))
+
+        for i in range(len(chats)):
+            chat = []
+            if not isinstance(chats[i], int):
+                chat = chats[i]
+                print(chat)
+                str = '\n'.join([tup[0] for tup in chat])
+                print (str)
+                strList = re.split('#split:#|\n', str )
+
+                names = []
+                for j in range(len(strList)- 2):
+                    if strList[j+2] == 'msg' and strList[j] is not username:
+                        names.append(strList[j])
+
+
+        #TODO: delete!
+
+        names.append("Olaf")
+        names.append("Elsa")
+
+        return names
 
     def changeUsername(self, newUsername):
         print(newUsername)
@@ -687,8 +736,8 @@ class Chat(Frame):
 
                 elif self.ButtonTask == 'private Chat' and self.ButtonType == 'create':
                     self.create_chat(self.id_field.get())
-                    
-                
+
+
                 if error_type == 'None':
                     self.BackTask = ""
                     self.ButtonType = ""
@@ -696,13 +745,13 @@ class Chat(Frame):
                     self.confirm_Button.grid_remove()
                     self.id_field.config(state=NORMAL)
                     self.back_Button.grid_remove()
-                    
+
                     self.create_Button.grid(row=0, column=1, sticky="ew")
                     self.nickname_Button.grid(row=0, column=3, sticky="ew")
                     self.join_Button.grid(row=0, column=2, sticky="ew")
-                    
+
                     self.button_state = 0  # only advance by one state when back button was not activated
-                    
+
                 else:  # 'error' occured
                     self.id_field.delete(0, END)
                     self.id_field.insert(0, error_type)
@@ -714,7 +763,7 @@ class Chat(Frame):
                 self.id_field.grid_remove()
                 self.id_field.config(state=NORMAL)
                 self.confirm_Button.grid_remove()
-                
+
                 if self.ButtonTask == 'group' or self.ButtonTask == 'private Chat':
                     self.ButtonTask = ""
                     self.privateChat_Button.grid(row=0, column=1, sticky="ew")
@@ -785,9 +834,9 @@ class Chat(Frame):
                     self.text_field.insert(0, "Sorry, given path does not exist, please try again!")
             else:  # normal message recognized
                 self.save(message + "#split:#msg", chat_id)
-        else: 
+        else:
             self.text_field.delete(0, 'end')
-            
+
     def save(self, message, chatID):
         to_save = self.username+"#split:#"+message
 
@@ -862,7 +911,7 @@ class Chat(Frame):
             assembled_content = assembled_content + parts[i]
 
         return assembled_content
-        
+
 
     def open_file1(self):
         global switch
@@ -870,7 +919,7 @@ class Chat(Frame):
             selection = self.listBox1.curselection()[0]  # this gives an int value: first element = 0
         except IndexError:
             return
-            
+
         if selection or selection == 0:
 
             item = self.listBox1.get(selection)
@@ -891,7 +940,7 @@ class Chat(Frame):
                     index -= 1
                     part_as_string = messages[index][0].split("#split:#")
                     if len(part_as_string) == 4 and part_as_string[0] == sender_of_file:
-                        content_of_file.append(part_as_string[1]) 
+                        content_of_file.append(part_as_string[1])
                         counter -= 1
 
                 type_of_file = ""
@@ -911,7 +960,7 @@ class Chat(Frame):
             selection = self.listBox2.curselection()[0]  # this gives an int value: first element = 0
         except IndexError:
             return
-            
+
         if selection or selection == 0:
 
             item = self.listBox2.get(selection)
@@ -932,7 +981,7 @@ class Chat(Frame):
                     index -= 1
                     part_as_string = messages[index][0].split("#split:#")
                     if len(part_as_string) == 4 and part_as_string[0] == sender_of_file:
-                        content_of_file.append(part_as_string[1]) 
+                        content_of_file.append(part_as_string[1])
                         counter -= 1
 
                 type_of_file = ""

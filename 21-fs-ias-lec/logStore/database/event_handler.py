@@ -60,6 +60,13 @@ class EventHandler(metaclass=Singleton):
                                                                    application=application_action,
                                                                    username=username, oldusername=oldusername,
                                                                    timestamp=timestamp, text='')
+            elif application == 'feed_control':
+                file = open("connectedPerson.txt", "a")
+                file.write("\n")
+                print("event handler " + content[1]['trustedName'])
+                file.write(content[1]['trustedName'])
+                file.close()
+
             elif application == 'MASTER':
                 self.master_handler(seq_no, feed_id, content, cont_ident, event_as_cbor)
 
@@ -117,6 +124,12 @@ class EventHandler(metaclass=Singleton):
         elif event == 'Radius':
             self.__sqlAlchemyConnector.insert_master_event(False, feed_id, None, None, seq_no,
                                                            None, None, content[1]['radius'], event_as_cbor, None)
+        elif event == 'ReportName':
+            file = open("connectedPerson.txt", "a")
+            file.write("\n")
+            print("event handler " + content[1]['trustedName'])
+            file.write(content[1]['trustedName'])
+            file.close()
         else:
             raise InvalidApplicationError('Invalid action called %s' % event)
 

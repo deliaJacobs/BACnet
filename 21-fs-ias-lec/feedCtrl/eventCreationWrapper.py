@@ -15,6 +15,10 @@ class EventCreationWrapper:
     def create_name(self, name):
         return self._eventFactory.next_event('MASTER/Name', {'name': name})
 
+    def create_trusted_name(self, name):
+        print("ecentCreationWrapper " + name)
+        return self._eventFactory.next_event('MASTER/ReportName', {'trustedName': name})
+
     def create_newFeed(self, feed_id, appName):
         return self._eventFactory.next_event('MASTER/NewFeed', {'feed_id': feed_id, 'app_name': appName})
 
