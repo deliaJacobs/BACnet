@@ -1,3 +1,5 @@
+import pickle
+
 from logStore.funcs.EventCreationTool import EventFactory
 from logStore.appconn.feed_ctrl_connection import FeedCtrlConnection
 from nacl.signing import SigningKey
@@ -23,6 +25,12 @@ class UiFunctionHandler:
             self._fcc.add_event(_firstEvent)
             self._fcc.add_event(_secondEvent)
             self._fcc.add_event(_thirdEvent)
+
+            self.dictionary = {
+                'username': "",
+                'public_key': ""
+            }
+            pickle.dump(self.dictionary, open("username.pkl", "wb"))  # save username
         self._masterID = self._fcc.get_host_master_id()
 
     def get_host_master_id(self):
@@ -74,6 +82,13 @@ class UiFunctionHandler:
     def set_username(self, name):
         new_event = self._eventCreationWrapper.create_name(name)
         self._fcc.add_event(new_event)
+
+        # insert name in plk file
+        file = open("username.pkl", "rb")
+        dict = pickle.load(file)
+        dict['username'] = name
+        pickle.dump(dict, open("username.pkl", "wb"))  # save username
+
     """
     def set_trusted_name(self, name):
         print("uiFunctionsHandler " + name)

@@ -44,11 +44,11 @@ class EventHandler(metaclass=Singleton):
 
                     newName = content[1]['name']
 
-                    file = open('connectedPerson.pkl', 'rb')
-                    connPep = pickle.load(file)
-                    file.close()
-
                     if not newName == username_dict['username']:
+
+                        file = open('connectedPerson.pkl', 'rb')
+                        connPep = pickle.load(file)
+                        file.close()
                         connPep[newName] = newName
                         file = open('connectedPerson.pkl', 'wb')
                         pickle.dump(connPep, file)
@@ -70,17 +70,21 @@ class EventHandler(metaclass=Singleton):
                             if entry == content[1]['fromUser']:
                                 print("entry found")
                                 # there is no nickname for this person
-                                if entry[0] == entry[1]:
+                                if entry == entries[entry]:
                                     print("no nickname")
                                     entries[content[1]['newName']] = content[1]['newName']
+                                    entries.pop(entry)
+                                    break
                                 else:
                                     print("with nickname")
                                     #there is a nickname for this person
                                     entries[content[1]['newName']] = entries[content[1]['fromUser']]
+                                    break
 
-                        f = open('connectedPerson.pkl', 'wb')
-                        pickle.dump(entries, f)
-                        f. close()
+                    f = open('connectedPerson.pkl', 'wb')
+                    pickle.dump(entries, f)
+                    f.close()
+
 
 
 

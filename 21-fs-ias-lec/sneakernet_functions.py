@@ -1,4 +1,6 @@
 import os
+import pickle
+
 import LogMerge
 
 #### TODO: SHOULD TAKE IT AS A PARAMETER INSTEAD TO AVOID READING THE SAME FILE OVER AND OVER
@@ -111,6 +113,12 @@ class User:
         self.usersDictionary = getUsersDictionary(path)
         self.readDict()
 
+        # insert name in plk file
+        file = open("username.pkl", "rb")
+        dict = pickle.load(file)
+        dict['username'] = name
+        pickle.dump(dict, open("username.pkl", "wb"))  # save username
+
 
     def readDict(self):
         self.currentUserDictionary = {}
@@ -148,6 +156,22 @@ class User:
                 except KeyError:
                     dict_[feed] = 0
         return dict_
+
+    def changename(self, name):
+
+        # update in pkl file
+        username_file = open("username.pkl", 'rb')
+        username_dict = pickle.load(username_file)
+        username_file.close()
+
+        username_dict['username'] = name
+        pickle.dump(username_dict, open("username.pkl", 'wb'))
+
+        #update in username.txt:
+        users_file = open(self.pcapDumpPath + '/users.txt', 'r+')
+        string = users_file.read()
+        string.replace(self.username, name)
+        users_file.write(string)
 
     # This method imports events from the folder on the drive that holds the pcap files created by the export function.
     # returns nothing
