@@ -139,19 +139,24 @@ class Login(Frame):
 
     # -------------- HELP FUNCTIONS --------------
     def create_key(self, username=None):
-        if username != "" and len(username) <= 16:            
+        if username != "" and len(username) <= 16:
             ecf = EventCreationTool.EventFactory()
             public_key = ecf.get_feed_id()
             chat_function = ChatFunction()
             first_event = ecf.first_event('chat', chat_function.get_host_master_id())
-            
+
             chat_function.insert_event(first_event)
 
-            self.dictionary = {
-                'username': username,
-                'public_key': public_key
-            }
-            pickle.dump(self.dictionary, open(pickle_file_names[1], "wb"))  # save username and key
+            # save key
+            file = open("username.pkl", "rb")
+            dict = pickle.load(file)
+            dict['public_key'] = public_key
+            pickle.dump(dict, open("username.pkl", "wb"))
+
+            # create connectedPerson.pkl with empty dictionary
+            connPep = {}
+            pickle.dump(connPep, open("connectedPerson.pkl", 'wb'))
+
             print("Your username has been saved:", username)
 
             self.open_Chat()
@@ -248,7 +253,7 @@ class Chat(Frame):
         self.time = datetime.datetime.now()
         self.lastMessage = list()
         self.chat_function = ChatFunction()
-        
+
         # Set EventFactory      
         x = self.chat_function.get_current_event(self.chat_function.get_all_feed_ids()[1])
         most_recent_event = self.chat_function.get_current_event(self.feed_id)
@@ -402,6 +407,16 @@ class Chat(Frame):
             chat_message = chat[i][0].split("#split:#")  # a chat-message is like: username#split:#message, so we need to split this two
 
             partner_username = chat_message[0]  # from who is the message
+
+            # get nickname of partner
+            file = open("connectedPerson.pkl", 'rb')
+            connPep = pickle.load(file)
+            file.close()
+            for entry in connPep:
+                if entry == partner_username:
+                    partner_username = connPep[entry]
+                    break
+
             message = chat_message[1]  # the real content / message
             additional_msg = chat_message[2]
 
@@ -497,14 +512,24 @@ class Chat(Frame):
         for i in range(len(self.person_list)):
             if self.person_list[i][1] == self.partner[1]:
                 self.person_list[i][2] = time.time()
-                
-        chat_type = self.chat_function.get_full_chat(self.partner[1])[0][0].split("#split:#")[3]  # get the type of the chat (private or group)
-    
+
+        chat_type = self.chat_function.get_full_chat(self.partner[1])[0][0].split("#split:#")[
+            3]  # get the type of the chat (private or group)
+
+        # get nickname of partner
+        file = open("connectedPerson.pkl", 'rb')
+        connPep = pickle.load(file)
+        file.close()
+        for entry in connPep:
+            if entry == self.partner[0]:
+                self.partner[0] = connPep[entry]
+                break
+
         if chat_type == "private":
             self.username_label.config(text=TextWrapper.shorten_name(self.partner[0], 34))
         else:  # chat_type == "group"
             self.username_label.config(text=TextWrapper.shorten_name(self.partner[0], 27) + " (" + self.partner[1] + ")")
-    
+
         self.updateContent(self.partner[1])
 
     def check_for_new_messages(self, person_nr):
@@ -522,44 +547,72 @@ class Chat(Frame):
                 if self.partner[1] == self.person_list[i][1]:
                     counter = 0
 
-                self.listBox3.insert('end', TextWrapper.mergeNameCounter(self.person_list[i][0], counter))
+                # get nickname of partner
+                file = open("connectedPerson.pkl", 'rb')
+                connPep = pickle.load(file)
+                file.close()
+
+                partner_username = ''
+
+                for entry in connPep:
+                    if entry == self.person_list[i][0]:
+                        partner_username = connPep[entry]
+                        break
+
+                if partner_username == '':
+                    partner_username = self.person_list[i][0]
+
+                self.listBox3.insert('end', TextWrapper.mergeNameCounter(partner_username, counter))
 
                 if counter != 0:
                     self.listBox3.itemconfig(i, bg='#dfd')
                 else:
                     self.listBox3.itemconfig(i, bg="white")
 
-    # Hier muss funktionalität des Nickname-Buttons rein
-    # z.B. neues Fenster öffnen wo Nicknames angezeigt werden.
+    def createUnwantedEvent(self):
+        file = open('resetName.txt', 'r')
+        content = file.readline()
+        file.close()
+        information = content.split("/")
+        if information[0] == 'True':
+            # createUnwantedEvent(newName, fromUser, content[1]['oldName'])
+            newName = information[1]
+            oldName = information[2]
+            fromUser = information[3]
+            unwantedNameEvent = self.ecf.next_event('chat/unwantedName', {'name': newName, 'fromUser': fromUser,
+                                                                          'oldName': self.username})
+            chat_function = ChatFunction()
+            chat_function.insert_event(unwantedNameEvent)
+            file = open('resetName.txt', 'w')
+            file.write("False")
+            file.close()
+
+
+    # All functionalities of Names-Tab
     def openNameWindow(self):
         newWindow = Tk()
         newWindow.title("Nicknames")
-        self.geometry = newWindow.geometry("500x500")
+        self.geometry = newWindow.geometry("500x600")
+        self.createUnwantedEvent()
 
-
+        # Button and entry field for changing username
         entryField = Entry(newWindow)
-        entryField.grid(row=1, column=0,padx=10, pady=10)
+        entryField.grid(row=1, column=0, padx=10, pady=10)
 
-        Label(newWindow, text="Change your username:", font=('HelveticaNeue', 11)).grid(row=0, column=0, padx=10, pady=10)
+        Label(newWindow, text="Change your username:", font=('HelveticaNeue', 11)).grid(row=0, column=0, padx=10,
+                                                                                        pady=10)
         changeUsernameButton = Button(newWindow, text=" change username ",
-                                  command=lambda: [self.changeUsername(entryField.get()),entryField.delete(0,'end')], bg="#34B7F1",
-                                  activebackground="#0f9bd7", font=('HelveticaNeue', 11))
+                                      command=lambda: [self.changeUsername(entryField.get()),
+                                                       entryField.delete(0, 'end')], bg="#34B7F1",
+                                      activebackground="#0f9bd7", font=('HelveticaNeue', 11))
 
         changeUsernameButton.grid(column=1, row=1, padx=10, pady=10)
 
-
-
-        Label(newWindow, text="Change a friends nickname:", font=('HelveticaNeue', 11)).grid(row=2, column=0, padx=10, pady=10)
-
+        # options field, entry field and button to change a friends username
+        Label(newWindow, text="Change a friends nickname:", font=('HelveticaNeue', 11)).grid(row=2, column=0, padx=10,
+                                                                                             pady=10)
 
         names = []
-        """
-        diction = {}
-        diction['Olaf'] = 'Anna'
-        file1 = open('connectedPerson.pkl', 'wb')
-        pickle.dump(diction, file1)
-        file1.close()
-        """
 
         try:
             with open('connectedPerson.pkl', 'rb') as f:
@@ -571,8 +624,6 @@ class Chat(Frame):
         except FileNotFoundError:
             print("connectedPerson.pkl couldn't be found")
 
-
-
         variable = StringVar(newWindow)
         variable.set("Choose a Friend")  # default value
 
@@ -580,20 +631,22 @@ class Chat(Frame):
         w.grid(row=3, column=0, padx=10, pady=10)
 
         entryFieldFriend = Entry(newWindow)
-        entryFieldFriend.grid(row=4, column=0,padx=10, pady=10)
+        entryFieldFriend.grid(row=4, column=0, padx=10, pady=10)
 
-        changeFriendsUsernameButton = Button(newWindow, text=" change username ",
-                                  command=lambda: [self.changeFriendsUsername(entryFieldFriend.get(), variable.get()), entryFieldFriend.delete(0,'end')], bg="#34B7F1",
-                                  activebackground="#0f9bd7", font=('HelveticaNeue', 11))
+        changeFriendsUsernameButton = Button(newWindow, text=" change nickname",
+                                             command=lambda: [
+                                                 self.changeFriendsUsername(entryFieldFriend.get(), variable.get()),
+                                                 entryFieldFriend.delete(0, 'end')], bg="#34B7F1",
+                                             activebackground="#0f9bd7", font=('HelveticaNeue', 11))
 
         changeFriendsUsernameButton.grid(column=1, row=4, padx=10, pady=10)
 
-
-        Label(newWindow, text="List of all your nicknames:", font=('HelveticaNeue', 11)).grid(row=5, column=0, padx=10, pady=10)
-
+        # Listing all nicknames assigned to you by someone else
+        Label(newWindow, text="List of all your nicknames:", font=('HelveticaNeue', 11)).grid(row=5, column=0, padx=10,
+                                                                                              pady=10)
 
         listbox = Listbox(newWindow)
-        listbox.grid(row=6, column=0,padx=10, pady=10)
+        listbox.grid(row=6, column=0, padx=10, pady=10)
 
         scrollbar = Scrollbar(listbox, orient="vertical")
         scrollbar.config(command=listbox.yview)
@@ -611,31 +664,46 @@ class Chat(Frame):
         # add my_names_list into listbox
         listbox.insert(END, *my_names_list)
 
+        # add unwanted nicknames
+
+        entryFieldUnwanted = Entry(newWindow)
+        entryFieldUnwanted.grid(row=8, column=0, padx=10, pady=10)
+
+        Label(newWindow, text="Enter an Unwanted Nickname:", font=('HelveticaNeue', 11)).grid(row=7, column=0, padx=10,
+                                                                                              pady=10)
+
+        unwantedButton = Button(newWindow, text=" add Name ",
+                                command=lambda: [self.addUnwanted(entryFieldUnwanted.get()),
+                                                 entryFieldUnwanted.delete(0, 'end')], bg="#34B7F1",
+                                activebackground="#0f9bd7", font=('HelveticaNeue', 11))
+
+        unwantedButton.grid(column=1, row=8, padx=10, pady=10)
 
         newWindow.mainloop()
 
     def changeUsername(self, newUsername):
         self.dictionary['username'] = newUsername
 
-        #change the file of names to save new username
+        # change the file of names to save new username
         outfile = open(pickle_file_names[1], "wb")
-        pickle.dump(self.dictionary,outfile)
+        pickle.dump(self.dictionary, outfile)
         outfile.close()
 
         print("Your username has been changed to: " + self.dictionary['username'])
-        #print(self.partner[1])
+        # print(self.partner[1])
         self.master.title("BAC net  -  " + newUsername.upper())
 
-        changedMyUsernameEvent = self.ecf.next_event('chat/MyNameChanged', {'newName': newUsername, 'fromUser': self.username})
+        changedMyUsernameEvent = self.ecf.next_event('chat/MyNameChanged',
+                                                     {'newName': newUsername, 'fromUser': self.username})
         chat_function = ChatFunction()
         event = Event.from_cbor(changedMyUsernameEvent)
         chat_function.insert_event(changedMyUsernameEvent)
 
-
-
     def changeFriendsUsername(self, newFriendsUsername, oldName):
         # create an event
-        changeFriendsUsernameEvent = self.ecf.next_event('chat/nameChanged', {'newName': newFriendsUsername, 'fromUser': self.username})
+        changeFriendsUsernameEvent = self.ecf.next_event('chat/nameChanged',
+                                                         {'newName': newFriendsUsername, 'fromUser': self.username,
+                                                          'oldFriendsUsername': oldName})
         chat_function = ChatFunction()
         event = Event.from_cbor(changeFriendsUsernameEvent)
         chat_function.insert_event(changeFriendsUsernameEvent)
@@ -657,18 +725,23 @@ class Chat(Frame):
         pickle.dump(file, f)
         f.close()
 
+    def addUnwanted(self, unwantedName):
 
+        file = open("unwantedNames.txt", 'a')
+        file.write(unwantedName + "\n")
+        file.close()
 
     def saveTypeAndSwitchState(self, Type):
         if Type == 'back':
             self.BackTask = Type
-            #self.button_state = (self.button_state - 1) % 3
-        elif self.button_state == 0: #Type is 'create' or 'join':
+            # self.button_state = (self.button_state - 1) % 3
+        elif self.button_state == 0:  # Type is 'create' or 'join':
             self.ButtonType = Type
             if Type == 'join':
                 self.privateChat_Button.grid_remove()
                 self.group_Button.grid_remove()
                 self.join_Button.grid_remove()
+                self.nickname_Button.grid_remove()
                 self.id_field.insert(0, "Enter ID here")
                 self.confirm_Button.grid(row=0, column=1, sticky="ew")
                 self.id_field.grid(row=0, column=0, sticky="ew")
@@ -676,14 +749,14 @@ class Chat(Frame):
                 self.ButtonTask == ""
                 self.back_Button.grid(row=0, column=3, sticky="e")
                 self.button_state = 2
-        elif self.button_state == 1: #Type is 'private Chat' or 'group':
+        elif self.button_state == 1:  # Type is 'private Chat' or 'group':
             self.ButtonTask = Type
         elif self.button_state == 2:
             self.switchState(Type)
             return
         self.switchState()
 
-    def switchState(self, Type = None):  # creates a menu like behaviour of the buttons
+    def switchState(self, Type=None):  # creates a menu like behaviour of the buttons
         # STATE = 0
         if self.button_state == 0:  # after first click (we now know the Button Type ('create' or 'join'))
             self.create_Button.grid_remove()
@@ -718,8 +791,8 @@ class Chat(Frame):
                 self.group_Button.grid_remove()
                 self.back_Button.grid_remove()
                 self.create_Button.grid(row=0, column=1, sticky="nsew")
-                self.nickname_Button.grid(row=0, column=2, sticky="nsew")
-                self.join_Button.grid(row=0, column=3, sticky="nsew")
+                self.nickname_Button.grid(row=0, column=3, sticky="nsew")
+                self.join_Button.grid(row=0, column=2, sticky="nsew")
 
                 self.button_state = 0
 
@@ -744,8 +817,7 @@ class Chat(Frame):
 
                 elif self.ButtonTask == 'private Chat' and self.ButtonType == 'create':
                     self.create_chat(self.id_field.get())
-                    
-                
+
                 if error_type == 'None':
                     self.BackTask = ""
                     self.ButtonType = ""
@@ -753,13 +825,13 @@ class Chat(Frame):
                     self.confirm_Button.grid_remove()
                     self.id_field.config(state=NORMAL)
                     self.back_Button.grid_remove()
-                    
+
                     self.create_Button.grid(row=0, column=1, sticky="ew")
-                    self.nickname_Button.grid(row=0, column=3, sticky="ew")
-                    self.join_Button.grid(row=0, column=2, sticky="ew")
-                    
+                    self.nickname_Button.grid(row=0, column=2, sticky="ew")
+                    self.join_Button.grid(row=0, column=3, sticky="ew")
+
                     self.button_state = 0  # only advance by one state when back button was not activated
-                    
+
                 else:  # 'error' occured
                     self.id_field.delete(0, END)
                     self.id_field.insert(0, error_type)
@@ -771,7 +843,7 @@ class Chat(Frame):
                 self.id_field.grid_remove()
                 self.id_field.config(state=NORMAL)
                 self.confirm_Button.grid_remove()
-                
+
                 if self.ButtonTask == 'group' or self.ButtonTask == 'private Chat':
                     self.ButtonTask = ""
                     self.privateChat_Button.grid(row=0, column=1, sticky="ew")
@@ -781,7 +853,7 @@ class Chat(Frame):
                     self.ButtonTask = ""
                     self.back_Button.grid_remove()
                     self.create_Button.grid(row=0, column=1, sticky="ew")
-                    self.nickname_Button_Button.grid(row=0, column=3, sticky="ew")
+                    self.nickname_Button.grid(row=0, column=3, sticky="ew")
                     self.join_Button.grid(row=0, column=2, sticky="ew")
                     self.button_state = 0
         if self.partner[1] != "":
@@ -805,7 +877,8 @@ class Chat(Frame):
         if self.partner[1] != "":
             count = 0  # check if the message consists of only spaces
             for i in range(len(message)):
-                if message[i] != " " and count == 0:  # check how many chars are not spaces. if we found one that is not a space, we can continue
+                if message[
+                    i] != " " and count == 0:  # check how many chars are not spaces. if we found one that is not a space, we can continue
                     count += 1
 
             if message == "" or count == 0 or not self.person_list or not self.partner:
@@ -818,7 +891,7 @@ class Chat(Frame):
                 if os.path.isdir(file_path[0:file_path.rfind('/')]):  # check if path is a valid directory
                     if os.path.isfile(file_path):  # check if path has a file
                         file_string = self.encode_file(file_path)
-                        file_name = file_path[file_path.rfind('/')+1:]
+                        file_name = file_path[file_path.rfind('/') + 1:]
                         length = len(file_string)
                         kilobyte = 1000  # a thousand chars fit into one kilobyte
                         if length > 100 * kilobyte:  # file too big
@@ -827,12 +900,15 @@ class Chat(Frame):
                         elif length > kilobyte:  # if more than one KiloByte
                             partition_len = int(math.ceil(length / kilobyte))
                             for i in range(partition_len):
-                                if i == int(partition_len)-1:  # We arrived at last part
-                                    self.save(file_string[i*kilobyte:] + "#split:#" + file_type + str(partition_len) + "_" + file_name, chat_id)
+                                if i == int(partition_len) - 1:  # We arrived at last part
+                                    self.save(file_string[i * kilobyte:] + "#split:#" + file_type + str(
+                                        partition_len) + "_" + file_name, chat_id)
                                 else:
-                                    self.save(file_string[i*kilobyte:(i+1)*kilobyte] + "#split:#filepart#split:#filepart" , chat_id)
+                                    self.save(file_string[
+                                              i * kilobyte:(i + 1) * kilobyte] + "#split:#filepart#split:#filepart",
+                                              chat_id)
 
-                        else: # length <= 1000
+                        else:  # length <= 1000
                             self.save(file_string + "#split:#" + file_type + file_name, chat_id)
                     else:  # file not found
                         self.text_field.delete(0, 'end')
@@ -842,32 +918,36 @@ class Chat(Frame):
                     self.text_field.insert(0, "Sorry, given path does not exist, please try again!")
             else:  # normal message recognized
                 self.save(message + "#split:#msg", chat_id)
-        else: 
+        else:
             self.text_field.delete(0, 'end')
-            
-    def save(self, message, chatID):
-        to_save = self.username+"#split:#"+message
 
-        new_event = self.ecf.next_event('chat/saveMessage', {'messagekey': to_save, 'chat_id': chatID, 'timestampkey': time.time()})
+    def save(self, message, chatID):
+        to_save = self.username + "#split:#" + message
+
+        new_event = self.ecf.next_event('chat/saveMessage',
+                                        {'messagekey': to_save, 'chat_id': chatID, 'timestampkey': time.time()})
         self.chat_function.insert_chat_msg(new_event)
 
         if self.partner[1] != "":
-            self.loadChat(self.partner) #updating chat, so the send message is also added in the listbox
+            self.loadChat(self.partner)  # updating chat, so the send message is also added in the listbox
         self.text_field.delete(0, 'end')
 
     def create_chat(self, ID, name=None):
         if not name:
             self.person_list.append([ID, ID, 0])
-            self.partner[0]=ID
-            self.partner[1]=ID
-            self.save(self.username+"#split:#member#split:#private", ID)
-        else: #group was created
-            self.person_list.append([name, ID, 0]) # it's a group so we do know the name
-            self.partner[0]=name
-            self.partner[1]=ID
-            self.save(name+"#split:#member#split:#group", ID)
+            self.partner[0] = ID
+            self.partner[1] = ID
+            self.save(self.username + "#split:#member#split:#private", ID)
+        else:  # group was created
 
-        sendNameEvent = self.ecf.next_event('chat/sendName',{'name': self.username})
+            # Nickname und nicht name einfügen
+
+            self.person_list.append([name, ID, 0])  # it's a group so we do know the name
+            self.partner[0] = name
+            self.partner[1] = ID
+            self.save(name + "#split:#member#split:#group", ID)
+
+        sendNameEvent = self.ecf.next_event('chat/sendName', {'name': self.username})
         chat_function = ChatFunction()
         event = Event.from_cbor(sendNameEvent)
         chat_function.insert_event(sendNameEvent)
@@ -877,21 +957,20 @@ class Chat(Frame):
 
     def join_chat(self, ID):
         if self.is_joinable(ID):
+            self.person_list.append([ID, ID, 0])
+            partnerName = self.chat_function.get_full_chat(ID)[0][0].split("#split:#")[
+                1]  # taking the name of the partner for the frome the first message
+            self.person_list[-1][0] = partnerName  # index -1 is the index of the last list-element
+            self.partner[0] = partnerName
+            self.partner[1] = ID
+            self.save(self.username + "#split:#member#split:#chat", ID)
+            self.addPartners()
+            self.loadChat(self.partner)
 
-            sendNameEvent = self.ecf.next_event('chat/sendName',{'name': self.username})
+            sendNameEvent = self.ecf.next_event('chat/sendName', {'name': self.username})
             chat_function = ChatFunction()
             event = Event.from_cbor(sendNameEvent)
             chat_function.insert_event(sendNameEvent)
-
-
-            self.person_list.append([ID, ID, 0])
-            partnerName = self.chat_function.get_full_chat(ID)[0][0].split("#split:#")[1]  # taking the name of the partner for the frome the first message
-            self.person_list[-1][0] = partnerName  # index -1 is the index of the last list-element
-            self.partner[0]=partnerName
-            self.partner[1]=ID
-            self.save(self.username+"#split:#member#split:#chat", ID)
-            self.addPartners()
-            self.loadChat(self.partner)
 
     def count_users_in_chat(self, chatID, since=None):
         counter = 0
@@ -915,7 +994,8 @@ class Chat(Frame):
             if len(chat) == 0:
                 return False  # the chat isn't even created
 
-            if chat[0][0].split("#split:#")[3] == "private" and self.count_users_in_chat(chatID) == 2:  # max. member for private chat: 2
+            if chat[0][0].split("#split:#")[3] == "private" and self.count_users_in_chat(
+                    chatID) == 2:  # max. member for private chat: 2
                 return False
 
             for i in range(len(self.person_list)):  # So the person cannot write with himself
@@ -928,11 +1008,10 @@ class Chat(Frame):
 
         assembled_content = ""
 
-        for i in range (len(parts)):
+        for i in range(len(parts)):
             assembled_content = assembled_content + parts[i]
 
         return assembled_content
-        
 
     def open_file1(self):
         global switch
@@ -940,60 +1019,20 @@ class Chat(Frame):
             selection = self.listBox1.curselection()[0]  # this gives an int value: first element = 0
         except IndexError:
             return
-            
+
         if selection or selection == 0:
 
             item = self.listBox1.get(selection)
-            if len(item) >= 21 and (item[0:19] == "Click to open PDF. " or item[0:21] == "Click to open image. "):  # the content should be "Click to open the file. (index)"
-                index = int(item[item.find("(")+1:item.find(")")])  # getting the index
+            if len(item) >= 21 and (item[0:19] == "Click to open PDF. " or item[
+                                                                           0:21] == "Click to open image. "):  # the content should be "Click to open the file. (index)"
+                index = int(item[item.find("(") + 1:item.find(")")])  # getting the index
                 messages = self.chat_function.get_full_chat(self.partner[1])
                 part_as_string = messages[index][0].split("#split:#")
 
                 sender_of_file = part_as_string[0]
 
                 content_of_file = list()
-                content_of_file.append(part_as_string[1]) #last part
-
-                name_of_file = part_as_string[2]
-                counter = int(name_of_file[3:name_of_file.find("_")]) - 1
-
-                while counter != 0:
-                    index -= 1
-                    part_as_string = messages[index][0].split("#split:#")
-                    if len(part_as_string) == 4 and part_as_string[0] == sender_of_file:
-                        content_of_file.append(part_as_string[1]) 
-                        counter -= 1
-
-                type_of_file = ""
-                if name_of_file[0:3] == "pdf":
-                    type_of_file = "pdf"
-                elif name_of_file[0:3] == "img":
-                    type_of_file = "img"
-
-                content_of_file.reverse()
-
-                assembled_content = self.assemble_file_parts(content_of_file)
-
-                self.open_file(assembled_content, name_of_file[name_of_file.find("_")+1:], type_of_file)
-
-    def open_file2(self):
-        try:
-            selection = self.listBox2.curselection()[0]  # this gives an int value: first element = 0
-        except IndexError:
-            return
-            
-        if selection or selection == 0:
-
-            item = self.listBox2.get(selection)
-            if len(item) >= 21 and (item[0:19] == "Click to open PDF. " or item[0:21] == "Click to open image. "):  # the content should be "Click to open the file. (index)"
-                index = int(item[item.find("(")+1:item.find(")")])  # getting the index
-                messages = self.chat_function.get_full_chat(self.partner[1])
-                part_as_string = messages[index][0].split("#split:#")
-
-                sender_of_file = part_as_string[0]
-
-                content_of_file = list()
-                content_of_file.append(part_as_string[1]) #last part
+                content_of_file.append(part_as_string[1])  # last part
 
                 name_of_file = part_as_string[2]
                 counter = int(name_of_file[3:name_of_file.find("_")]) - 1
@@ -1015,15 +1054,60 @@ class Chat(Frame):
 
                 assembled_content = self.assemble_file_parts(content_of_file)
 
-                self.open_file(assembled_content, name_of_file[name_of_file.find("_")+1:], type_of_file)
+                self.open_file(assembled_content, name_of_file[name_of_file.find("_") + 1:], type_of_file)
+
+    def open_file2(self):
+        try:
+            selection = self.listBox2.curselection()[0]  # this gives an int value: first element = 0
+        except IndexError:
+            return
+
+        if selection or selection == 0:
+
+            item = self.listBox2.get(selection)
+            if len(item) >= 21 and (item[0:19] == "Click to open PDF. " or item[
+                                                                           0:21] == "Click to open image. "):  # the content should be "Click to open the file. (index)"
+                index = int(item[item.find("(") + 1:item.find(")")])  # getting the index
+                messages = self.chat_function.get_full_chat(self.partner[1])
+                part_as_string = messages[index][0].split("#split:#")
+
+                sender_of_file = part_as_string[0]
+
+                content_of_file = list()
+                content_of_file.append(part_as_string[1])  # last part
+
+                name_of_file = part_as_string[2]
+                counter = int(name_of_file[3:name_of_file.find("_")]) - 1
+
+                while counter != 0:
+                    index -= 1
+                    part_as_string = messages[index][0].split("#split:#")
+                    if len(part_as_string) == 4 and part_as_string[0] == sender_of_file:
+                        content_of_file.append(part_as_string[1])
+                        counter -= 1
+
+                type_of_file = ""
+                if name_of_file[0:3] == "pdf":
+                    type_of_file = "pdf"
+                elif name_of_file[0:3] == "img":
+                    type_of_file = "img"
+
+                content_of_file.reverse()
+
+                assembled_content = self.assemble_file_parts(content_of_file)
+
+                self.open_file(assembled_content, name_of_file[name_of_file.find("_") + 1:], type_of_file)
 
     @staticmethod
-    def generate_ID():  #generates a secure random id
-        ID = list(''.join(random.SystemRandom().choice(string.ascii_lowercase + string.ascii_uppercase + string.digits) for i in range(6)))
+    def generate_ID():  # generates a secure random id
+        ID = list(''.join(
+            random.SystemRandom().choice(string.ascii_lowercase + string.ascii_uppercase + string.digits) for i in
+            range(6)))
         for i in range(len(ID)):
-            if ID[i] == 'I' or ID[i] == 'l':  #to increase readibility we do not allow I and l since they aren't differentiatable in out chosen Font
-                ID[i] = str(random.randint(0,9))
-        return(''.join(ID))
+            if ID[i] == 'I' or ID[
+                i] == 'l':  # to increase readibility we do not allow I and l since they aren't differentiatable in out chosen Font
+                ID[i] = str(random.randint(0, 9))
+        return (''.join(ID))
 
     @staticmethod
     def encode_file(file_path):
@@ -1054,7 +1138,7 @@ root.iconphoto(True, img)
 
 # Testing
 probe = 'no_key'  # by default, there is no key and no name set
-try: # Try to get the key (if it works, then  we can skip the login and go directly to the chat)
+try:  # Try to get the key (if it works, then  we can skip the login and go directly to the chat)
     p = pickle.load(open(pickle_file_names[1], "rb"))  # try to load key and name
     probe = 'key_loaded_but_list_not'  # if loading the name didn't throw an error probe is set to 'no_key'
     p = pickle.load(open(pickle_file_names[0], "rb"))  # try to load personList
@@ -1069,10 +1153,9 @@ if probe == 'no_key':  # this is only the case when there
 elif probe == 'key_loaded_but_list_not':  # if the key could be loaded but the list not, we need to assign it first
     List = list()
     pickle.dump(List, open(pickle_file_names[0], "wb"))  # create an empty object
-    app = Chat(master=root)  # If there is already an exiting key, we can just login
+    app = Chat(master=root)  # If there is already an existing key, we can just login
 elif probe == 'list_and_name_loaded':  # when everythingg is already set up, we can just start the Chat window
     app = Chat(master=root)  # If there is already an exiting key, we can just login
-
 
 # Main Loop:
 try:
@@ -1083,9 +1166,6 @@ try:
 except:
     pass
 
-
 # Save settings with pickle
 pickle.dump(app.person_list, open(pickle_file_names[0], "wb"))  # create an empty object
 print("\"personList\" has been saved to \"" + pickle_file_names[0] + "\": personList = ", app.person_list)
-
-

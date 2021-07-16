@@ -31,12 +31,6 @@ class EventHandler(metaclass=Singleton):
             application_action = cont_ident[1]
 
             if application == 'chat':
-
-                username_file = open("username.pkl", 'rb')
-                username_dict = pickle.load(username_file)
-                username_file.close()
-
-
                 if application_action == 'MASTER':
                     return
 
@@ -44,17 +38,43 @@ class EventHandler(metaclass=Singleton):
 
                     newName = content[1]['name']
 
-                    file = open('connectedPerson.pkl', 'rb')
-                    connPep = pickle.load(file)
-                    file.close()
+                    username_file = open("username.pkl", 'rb')
+                    username_dict = pickle.load(username_file)
+                    username_file.close()
 
                     if not newName == username_dict['username']:
+                        file = open('connectedPerson.pkl', 'rb')
+                        connPep = pickle.load(file)
+                    if not newName == username_dict['username']:
+
+                        file = open('connectedPerson.pkl', 'rb')
+                        connPep = pickle.load(file)
+                        file.close()
+
                         connPep[newName] = newName
                         file = open('connectedPerson.pkl', 'wb')
                         pickle.dump(connPep, file)
                         file.close()
 
+                        alreadyExists = False
+
+                        for entry in connPep:
+                            if entry == newName:
+                                alreadyExists = True
+                                break
+
+                        if not alreadyExists:
+                            connPep[newName] = newName
+                            file = open('connectedPerson.pkl', 'wb')
+                            pickle.dump(connPep, file)
+                            file.close()
+
                 elif application_action == 'MyNameChanged':
+
+                    username_file = open("username.pkl", 'rb')
+                    username_dict = pickle.load(username_file)
+                    username_file.close()
+
                     if not content[1]['fromUser'] == username_dict['username']:
 
                         f = open('connectedPerson.pkl', 'rb')
@@ -63,39 +83,95 @@ class EventHandler(metaclass=Singleton):
 
                         for entry in entries:
                             # entry[0] = key for specific entry, content[1]['fromUser'] = oldUsername
-                            print("before if else")
-                            print(entries)
-                            print(entry)
-                            print(content[1])
                             if entry == content[1]['fromUser']:
-                                print("entry found")
                                 # there is no nickname for this person
-                                if entry[0] == entry[1]:
-                                    print("no nickname")
+                                if entry == entries[entry]:
                                     entries[content[1]['newName']] = content[1]['newName']
+                                    entries.pop(entry)
+                                    break
                                 else:
-                                    print("with nickname")
-                                    #there is a nickname for this person
+                                    # there is a nickname for this person
                                     entries[content[1]['newName']] = entries[content[1]['fromUser']]
+                                    entries.pop(entry)
+                                    break
 
-                        f = open('connectedPerson.pkl', 'wb')
-                        pickle.dump(entries, f)
-                        f. close()
+                    f = open('connectedPerson.pkl', 'wb')
+                    pickle.dump(entries, f)
+                    f.close()
 
+                    f = open('connectedPerson.pkl', 'wb')
+                    pickle.dump(entries, f)
+                    f.close()
 
 
 
                 elif application_action == 'nameChanged':
+
                     #Someone gave me a nickname
                     newName = content[1]['newName']
                     fromUser = content[1]['fromUser']
                     # only add the name if fromUser is not you:
+                    # therefor use username.pkl
+                    username_file = open("username.pkl", 'rb')
+                    username_dict = pickle.load(username_file)
+                    username_file.close()
 
                     if not fromUser == username_dict['username']:
+
+                        nameAcceptable = True
+
+                        file = open("unwantedNames.txt", 'r')
+                        names = file.readlines()
+
+                        for name in names:
+                            name = name.replace("\n", "")
+
+                            if newName.lower().find(name.lower()) != -1:
+                                nameAcceptable = False
+                                break
+                        file.close()
+
                         # add new name to txt, names slpi wi
                         my_names_file = open("my_names.txt", 'a')
-                        my_names_file.write(newName + ", ")
-                        my_names_file.close()
+
+                        if nameAcceptable == True:
+                            my_names_file.write(newName + ", ")
+                            my_names_file.close()
+
+                            file = open('resetName.txt', 'w')
+                            file.write("False")
+                            file.close()
+
+
+                        else:
+
+                            oldName = content[1]['oldFriendsUsername']
+                            file = open('resetName.txt', 'w')
+                            file.write("True/"+newName+"/"+oldName+"/"+fromUser)
+                            file.close()
+
+                elif application_action == 'unwantedName':
+
+                    username_file = open("username.pkl", 'rb')
+                    username_dict = pickle.load(username_file)
+                    username_file.close()
+                    if (content[1]['fromUser'] == username_dict['username']):
+                        with open('connectedPerson.pkl', 'rb') as f:
+                            file = pickle.load(f)
+                        f.close()
+
+                        key = ''
+                        items = file.items()
+                        for t in items:
+                            if t[1] == content[1]['name']:
+                                key = t[0]
+
+                        file[key] = content[1]['oldName']
+
+                        f = open('connectedPerson.pkl', 'wb')
+                        pickle.dump(file, f)
+                        f.close()
+
 
                 else:
                     chatMsg = content[1]['messagekey']
@@ -238,3 +314,4 @@ class EventHandler(metaclass=Singleton):
 class InvalidApplicationError(Exception):
     def __init__(self, message):
         super(InvalidApplicationError, self).__init__(message)
+
