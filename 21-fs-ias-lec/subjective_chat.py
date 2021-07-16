@@ -147,15 +147,11 @@ class Login(Frame):
 
             chat_function.insert_event(first_event)
 
-            # save key
-            file = open("username.pkl", "rb")
-            dict = pickle.load(file)
-            dict['public_key'] = public_key
-            pickle.dump(dict, open("username.pkl", "wb"))
-
-            # create connectedPerson.pkl with empty dictionary
-            connPep = {}
-            pickle.dump(connPep, open("connectedPerson.pkl", 'wb'))
+            self.dictionary = {
+                'username': username,
+                'public_key': public_key
+            }
+            pickle.dump(self.dictionary, open(pickle_file_names[1], "wb"))  # save username and key
 
             print("Your username has been saved:", username)
 
